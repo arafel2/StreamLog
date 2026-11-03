@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Mediateca</title>
+<title>StreamLog</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@ datalist { display: none; }
   var ICON_THEME = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>';
   var ICON_SET = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
   function renderHead() {
-    $("#head").innerHTML = '<header class="top"><div class="brand">Mediateca</div><div class="tools"><span id="savestate" class="savestate">Solo su questo dispositivo</span>' +
+    $("#head").innerHTML = '<header class="top"><div class="brand">StreamLog</div><div class="tools"><span id="savestate" class="savestate">Solo su questo dispositivo</span>' +
       '<button class="icon-btn" data-act="theme" aria-label="Cambia tema chiaro o scuro">' + ICON_THEME + "</button>" +
       '<button class="icon-btn" data-act="settings" aria-label="Impostazioni e backup">' + ICON_SET + "</button>" +
       '<button class="btn primary" data-act="add">Aggiungi</button></div></header>';
@@ -720,7 +720,7 @@ datalist { display: none; }
     var a = document.createElement("a");
     var dt = new Date();
     a.href = URL.createObjectURL(blob);
-    a.download = "mediateca-backup-" + dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()) + ".json";
+    a.download = "streamlog-backup-" + dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()) + ".json";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
