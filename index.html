@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Mediateca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: banner in evidenza, file orizzontali per genere, scheda titolo con stagioni e capitoli da spuntare. */
+:root {
+  --bg: #ECEEF3;
+  --surface: #FFFFFF;
+  --ink: #14161E;
+  --muted: #596074;
+  --line: #D6DAE4;
+  --accent: #2A3AE0;
+  --accent-ink: #FFFFFF;
+  --danger: #B3261E;
+  --on-cover: #FFFFFF;
+  --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1016; --surface: #171A23; --ink: #ECEEF6; --muted: #9AA1B6; --line: #2A2F3D;
+    --accent: #8896FF; --accent-ink: #0E1016; --danger: #FF8A80; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1016; --surface: #171A23; --ink: #ECEEF6; --muted: #9AA1B6; --line: #2A2F3D;
+  --accent: #8896FF; --accent-ink: #0E1016; --danger: #FF8A80; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body);
+  font-size: 15px; line-height: 1.45; padding-inline: 16px;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+.wrap { max-width: 980px; margin-inline: auto; padding-block: 0 40px; }
+
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-block: 12px; border-bottom: 1px solid var(--line);
+}
+.brand { font: 700 24px/1 var(--font-display); letter-spacing: -0.02em; }
+.tools { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.savestate { font: 400 11px var(--font-mono); color: var(--muted); white-space: nowrap; }
+@media (max-width: 560px) { .savestate { display: none; } }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 8px 14px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--ink); font-weight: 500; font-size: 14px;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--danger); }
+.btn.small { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.btn.light { background: #FFFFFF; color: #14161E; border-color: #FFFFFF; }
+.btn[disabled] { opacity: .5; cursor: default; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--line); flex: none;
+}
+
+main { padding-block: 16px; display: grid; gap: 16px; }
+.loading { color: var(--muted); margin: 0; }
+h1, h2 { text-wrap: balance; margin: 0; }
+.title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.title-row h1 { font: 700 32px/1.05 var(--font-display); letter-spacing: -0.02em; }
+.back { align-self: start; background: none; border: 0; padding: 4px 0; color: var(--muted); font-weight: 500; }
+
+.filters { display: grid; gap: 10px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-block: 2px; scrollbar-width: none; }
+.chip {
+  flex: none; min-height: 34px; padding: 4px 14px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line); font-size: 13.5px; font-weight: 500;
+}
+.chip[aria-pressed="true"], .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.search input {
+  width: 100%; min-height: 42px; padding: 8px 12px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line); font-size: 16px;
+}
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.poster {
+  position: relative; display: block; width: 100%; aspect-ratio: 3 / 4; padding: 0; border: 0;
+  border-radius: 14px; overflow: hidden; text-align: left; color: var(--on-cover);
+}
+.poster .art { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.poster .initial { position: absolute; top: -4%; right: 8%; font: 700 128px/1 var(--font-display); opacity: .16; pointer-events: none; }
+.poster .shade { position: absolute; inset: 0; background: linear-gradient(to top, rgba(8,10,16,.9) 0%, rgba(8,10,16,.55) 40%, rgba(8,10,16,0) 70%); }
+.poster .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px; display: grid; gap: 4px; }
+.poster h3 { margin: 0; font: 700 18px/1.1 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; overflow-wrap: anywhere; }
+.poster .meta { font: 400 11.5px/1.35 var(--font-mono); opacity: .92; }
+.tag {
+  position: absolute; top: 10px; left: 10px; padding: 2px 8px; border-radius: 999px;
+  font: 500 10.5px var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  background: rgba(8,10,16,.62); color: var(--on-cover);
+}
+.bar { height: 4px; border-radius: 2px; overflow: hidden; background: rgba(255,255,255,.28); }
+.bar i { display: block; height: 100%; background: #FFFFFF; }
+.bar.s { background: var(--line); height: 6px; border-radius: 3px; }
+.bar.s i { background: var(--accent); }
+
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 16px; padding: 28px 20px; display: grid; gap: 10px; justify-items: start; }
+.empty h2 { font: 700 24px/1.1 var(--font-display); }
+.empty p { margin: 0; color: var(--muted); max-width: 52ch; }
+
+.hero { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.thumb { width: 118px; aspect-ratio: 3 / 4; border-radius: 12px; background-size: cover; background-position: center; flex: none; position: relative; overflow: hidden; color: var(--on-cover); }
+.thumb .initial { position: absolute; top: -4%; right: 8%; font: 700 72px/1 var(--font-display); opacity: .18; }
+.info { flex: 1 1 220px; min-width: 0; display: grid; gap: 8px; }
+.info h1 { font: 700 30px/1.05 var(--font-display); letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.kicker { font: 500 11px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.mono { font: 400 13px var(--font-mono); color: var(--muted); margin: 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 12px; }
+label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.f input, .sheet input[type="text"], .sheet input[type="number"], .sheet input[type="search"], .sheet input[type="password"] {
+  width: 100%; min-height: 42px; padding: 8px 12px; border-radius: 10px;
+  background: var(--bg); border: 1px solid var(--line); font-size: 16px; color: var(--ink);
+}
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.season { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.season > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; flex-wrap: wrap; }
+.season .toggle { background: none; border: 0; padding: 4px 0; display: flex; align-items: baseline; gap: 10px; font: 700 18px var(--font-display); text-align: left; }
+.season .toggle .mono { font-size: 12px; }
+.season .tail { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.stack { display: grid; gap: 12px; }
+.row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line); min-width: 0; cursor: pointer; }
+.row input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent); flex: none; margin: 0; }
+.row .no { font: 500 12px var(--font-mono); color: var(--muted); min-width: 40px; flex: none; }
+.row .t { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.row .t.ph { color: var(--muted); }
+.row .pg { font: 400 12px var(--font-mono); color: var(--muted); flex: none; }
+.row.done .t { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.row.edit { cursor: default; }
+.row .t-in { flex: 1 1 auto; min-width: 0; min-height: 38px; padding: 6px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font-size: 15px; }
+.row .p-in { width: 76px; min-height: 38px; padding: 6px 8px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font-size: 15px; flex: none; }
+.x { width: 32px; height: 32px; border-radius: 8px; background: none; border: 1px solid var(--line); color: var(--muted); flex: none; }
+.bigcheck { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; font: 700 20px var(--font-display); cursor: pointer; }
+.bigcheck input { width: 28px; height: 28px; accent-color: var(--accent); margin: 0; }
+
+.sheet-bg { position: fixed; inset: 0; z-index: 20; background: rgba(6,8,14,.55); display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  width: min(600px, 100%); max-height: 92%; overflow-y: auto; background: var(--surface); color: var(--ink);
+  border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; align-content: start;
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sheet-head h2 { font: 700 22px var(--font-display); }
+.srow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.srow .num { width: 90px; }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.err { color: var(--danger); font-size: 14px; margin: 0; }
+.sheet-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.results { display: grid; gap: 8px; min-height: 40px; }
+.res { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); text-align: left; width: 100%; }
+.res .ph, .res img { width: 44px; aspect-ratio: 3 / 4; border-radius: 6px; object-fit: cover; flex: none; background: var(--line); }
+.res .ph { display: flex; align-items: center; justify-content: center; font: 700 18px var(--font-display); color: var(--muted); }
+.res .tx { min-width: 0; display: grid; gap: 2px; }
+.res .tx b { font-weight: 600; overflow-wrap: anywhere; }
+.res .tx span { font: 400 12px var(--font-mono); color: var(--muted); }
+.preview { display: flex; gap: 12px; align-items: center; }
+.preview img { width: 64px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; }
+.foot { border-top: 1px solid var(--line); padding-block: 16px; font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
+.foot p { margin: 0; max-width: 70ch; }
+datalist { display: none; }
+
+.hero-b { position: relative; overflow: hidden; border-radius: 18px; min-height: 340px; display: flex; align-items: flex-end; color: var(--on-cover); isolation: isolate; }
+.hero-b .bd { position: absolute; inset: -24px; z-index: -3; background-size: cover; background-position: center; filter: blur(16px) saturate(1.1); }
+.hero-b .initial { position: absolute; right: 6%; top: -6%; z-index: -2; font: 700 clamp(180px, 36vw, 340px)/1 var(--font-display); opacity: .14; pointer-events: none; }
+.hero-b .bdshade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, rgba(8,10,16,.94) 0%, rgba(8,10,16,.55) 48%, rgba(8,10,16,.18) 100%); }
+.hero-b .txt { padding: 22px; display: grid; gap: 10px; max-width: 560px; min-width: 0; }
+.hero-b h1 { font: 700 clamp(30px, 6vw, 48px)/1 var(--font-display); letter-spacing: -0.02em; overflow-wrap: anywhere; text-wrap: balance; }
+.hero-b .kicker, .banner .kicker { color: rgba(255,255,255,.82); }
+.hero-b .mono, .banner .mono { color: rgba(255,255,255,.86); }
+.hero-b .hp { position: absolute; right: 22px; bottom: 22px; width: 140px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+@media (max-width: 640px) { .hero-b .hp { display: none; } .hero-b { min-height: 300px; } }
+.rails { display: grid; gap: 22px; }
+.rowhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.rowhead h2 { font: 700 20px/1.1 var(--font-display); letter-spacing: -0.01em; }
+.rowhead button { background: none; border: 0; color: var(--muted); font-size: 13px; font-weight: 500; padding: 4px 0; }
+.rail { display: flex; gap: 12px; overflow-x: auto; padding-block: 6px 10px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.rail .poster { flex: none; width: 150px; scroll-snap-align: start; }
+.banner { position: relative; overflow: hidden; border-radius: 18px; padding: 20px; color: var(--on-cover); isolation: isolate; }
+.banner .bd { position: absolute; inset: -24px; z-index: -2; background-size: cover; background-position: center; filter: blur(18px); }
+.banner .bdshade { position: absolute; inset: 0; z-index: -1; background: rgba(8,10,16,.66); }
+.banner .bar.s { background: rgba(255,255,255,.28); }
+.banner .bar.s i { background: #FFFFFF; }
+@media (prefers-reduced-motion: no-preference) {
+  .poster { transition: transform .15s ease; }
+  .poster:hover { transform: translateY(-2px); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="head"></div>
+  <main id="main"><p class="loading">Carico la tua mediateca…</p></main>
+  <footer class="foot">
+    <p>Dati e copertine da <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>, <a href="https://anilist.co" target="_blank" rel="noopener">AniList</a> e <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>.</p>
+    <p>Questo prodotto usa l'API di TMDB ma non è approvato né certificato da TMDB.</p>
+  </footer>
+</div>
+<div id="sheetbg" class="sheet-bg" hidden><div id="sheet" class="sheet" role="dialog" aria-modal="true"></div></div>
+
+<script>
+(function () {
+  "use strict";
+  var GENRES = ["Azione", "Avventura", "Animazione", "Commedia", "Crimine", "Drammatico", "Fantasy", "Fantascienza", "Horror", "Thriller", "Romantico", "Slice of life", "Sport", "Mistero"];
+  var TYPES = [["film", "Film"], ["serie", "Serie TV"], ["anime", "Anime"], ["manga", "Manga"]];
+  var TYPE_LABEL = { film: "Film", serie: "Serie TV", anime: "Anime", manga: "Manga" };
+  var STATUS = [["all", "Tutti"], ["todo", "Da iniziare"], ["doing", "In corso"], ["done", "Finiti"]];
+  var NOGENRE = "Senza genere";
+  var KEY_STORE = "mediateca.v2", KEY_TMDB = "mediateca.tmdbkey", KEY_THEME = "mediateca.theme";
+  var IMG = "https://image.tmdb.org/t/p/w342";
+  var nf = new Intl.NumberFormat("it-IT");
+  var GENRE_MAP = {
+    "Action": "Azione", "Adventure": "Avventura", "Animation": "Animazione", "Comedy": "Commedia", "Crime": "Crimine", "Drama": "Drammatico",
+    "Dramma": "Drammatico", "Fantasy": "Fantasy", "Sci-Fi": "Fantascienza", "Science-Fiction": "Fantascienza", "Science Fiction": "Fantascienza",
+    "Sci-Fi & Fantasy": "Fantascienza", "Azione e avventura": "Azione", "Horror": "Horror", "Thriller": "Thriller", "Romance": "Romantico",
+    "Slice of Life": "Slice of life", "Sports": "Sport", "Sport": "Sport", "Mystery": "Mistero", "Supernatural": "Soprannaturale", "Music": "Musica",
+    "Family": "Famiglia", "History": "Storia", "War": "Guerra", "Mecha": "Mecha", "Psychological": "Psicologico", "Ecchi": "Ecchi", "Mahou Shoujo": "Magico",
+    "Documentary": "Documentario", "Western": "Western", "Kids": "Per ragazzi"
+  };
+  var FMT = { TV: "Serie", TV_SHORT: "Corto", MOVIE: "Film", SPECIAL: "Speciale", OVA: "OVA", ONA: "ONA", MUSIC: "Musica", MANGA: "Manga", NOVEL: "Romanzo", ONE_SHOT: "One shot" };
+
+  var state = { items: new Map(), screen: "home", genre: null, id: null, type: "all", status: "all", q: "", edit: false, confirmDel: false, closed: new Set(), sheet: null };
+
+  function $(s) { return document.querySelector(s); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function pl(n, s, p) { return nf.format(n) + " " + (n === 1 ? s : p); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function uid() { return "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function pad(n) { return n < 10 ? "0" + n : String(n); }
+  function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+  function grad(name) { var h = hash(name || "?") % 360; return "background:linear-gradient(155deg,hsl(" + h + " 52% 40%),hsl(" + ((h + 48) % 360) + " 58% 20%))"; }
+  function initial(s) { return esc((s || "?").trim().charAt(0).toUpperCase() || "?"); }
+  function bgStyle(it) { return it.cover ? "background-image:url('" + esc(it.cover) + "')" : grad(it.title); }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function normGenre(g) { g = (g || "").trim(); return GENRE_MAP[g] || g; }
+
+  /* ---------- calcoli ---------- */
+  function stats(it) {
+    if (it.type === "film") return { total: 1, done: it.done ? 1 : 0 };
+    if (it.type === "manga") { var tc = 0, dc = 0, pg = 0; it.chapters.forEach(function (c) { tc++; if (c.d) dc++; else pg += c.p || 0; }); return { total: tc, done: dc, pages: pg }; }
+    var t = 0, d = 0;
+    it.seasons.forEach(function (s) { s.eps.forEach(function (e) { t++; if (e.d) d++; }); });
+    return { total: t, done: d };
+  }
+  function statusOf(it) { var s = stats(it); if (s.done === 0) return "todo"; return s.done >= s.total ? "done" : "doing"; }
+  function remainingText(it) {
+    var s = stats(it), r = s.total - s.done;
+    if (it.type === "film") return it.done ? "Visto" : "Da vedere";
+    if (r <= 0) return "Completato";
+    if (it.type === "manga") return pl(r, "capitolo", "capitoli") + " · " + pl(s.pages, "pagina", "pagine") + " rimanenti";
+    return pl(r, "episodio rimanente", "episodi rimanenti");
+  }
+  function agg(list) {
+    var a = { films: 0, eps: 0, ch: 0, pages: 0 };
+    list.forEach(function (it) {
+      if (it.type === "film") { if (!it.done) a.films++; }
+      else if (it.type === "manga") { it.chapters.forEach(function (c) { if (!c.d) { a.ch++; a.pages += c.p || 0; } }); }
+      else { it.seasons.forEach(function (s) { s.eps.forEach(function (e) { if (!e.d) a.eps++; }); }); }
+    });
+    return a;
+  }
+  function aggText(a) {
+    var p = [];
+    if (a.films) p.push(pl(a.films, "film", "film"));
+    if (a.eps) p.push(pl(a.eps, "episodio", "episodi"));
+    if (a.ch) { p.push(pl(a.ch, "capitolo", "capitoli")); p.push(pl(a.pages, "pagina", "pagine")); }
+    return p.length ? p.join(" · ") + " rimanenti" : "Tutto completato";
+  }
+  function allGenres() {
+    var set = new Set(GENRES);
+    state.items.forEach(function (it) { if (it.genre && it.genre !== NOGENRE) set.add(it.genre); });
+    return Array.from(set).sort(function (a, b) { return a.localeCompare(b, "it"); });
+  }
+  function genreOptions() { return allGenres().map(function (g) { return '<option value="' + esc(g) + '"></option>'; }).join(""); }
+
+  /* ---------- salvataggio ---------- */
+  var saveT = null;
+  function setSave(txt) { var el = $("#savestate"); if (el) el.textContent = txt; }
+  function persist() {
+    clearTimeout(saveT);
+    setSave("Salvataggio…");
+    saveT = setTimeout(function () {
+      var ok = lsSet(KEY_STORE, JSON.stringify(Array.from(state.items.values())));
+      setSave(ok ? "Salvato su questo dispositivo" : "Spazio pieno: salvataggio non riuscito");
+    }, 300);
+  }
+  function touch(it) { it.lastAt = Date.now(); persist(); }
+  function loadItems() {
+    var raw = lsGet(KEY_STORE), arr = [];
+    try { arr = JSON.parse(raw || "[]"); } catch (e) { arr = []; }
+    (Array.isArray(arr) ? arr : []).forEach(function (d) { if (d && d.id && d.type && d.title) state.items.set(d.id, d); });
+  }
+
+  /* ---------- tema ---------- */
+  function applyTheme() { var t = lsGet(KEY_THEME); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); }
+  function toggleTheme() {
+    var cur = document.documentElement.getAttribute("data-theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    var next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    lsSet(KEY_THEME, next);
+  }
+
+  /* ---------- database online ---------- */
+  function tmdbKey() { return (lsGet(KEY_TMDB) || "").trim(); }
+  function jget(url, opt) { return fetch(url, opt).then(function (r) { if (!r.ok) throw { code: r.status }; return r.json(); }); }
+  function tmdb(path, params) {
+    var k = tmdbKey();
+    if (!k) return Promise.reject({ code: "nokey" });
+    var u = new URL("https://api.themoviedb.org/3" + path);
+    u.searchParams.set("language", "it-IT");
+    for (var p in (params || {})) u.searchParams.set(p, params[p]);
+    var opt = {};
+    if (k.length > 40) opt.headers = { Authorization: "Bearer " + k }; else u.searchParams.set("api_key", k);
+    return jget(u.toString(), opt);
+  }
+  function anilist(query, vars) {
+    return fetch("https://graphql.anilist.co", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ query: query, variables: vars }) })
+      .then(function (r) { if (!r.ok) throw { code: r.status }; return r.json(); })
+      .then(function (j) { if (j.errors) throw { code: "gql" }; return j.data; });
+  }
+  var AL_QUERY = "query($q:String,$t:MediaType){Page(perPage:8){media(search:$q,type:$t,sort:SEARCH_MATCH){id title{romaji english} coverImage{large} genres format episodes chapters startDate{year} streamingEpisodes{title}}}}";
+
+  function searchTitles(type, q) {
+    if (type === "film") {
+      return tmdb("/search/movie", { query: q, include_adult: "false" }).then(function (d) {
+        return (d.results || []).slice(0, 8).map(function (m) { return { src: "tmdb", id: m.id, title: m.title, sub: (m.release_date || "").slice(0, 4), cover: m.poster_path ? IMG + m.poster_path : "" }; });
+      });
+    }
+    if (type === "serie") {
+      if (tmdbKey()) {
+        return tmdb("/search/tv", { query: q }).then(function (d) {
+          return (d.results || []).slice(0, 8).map(function (m) { return { src: "tmdb", id: m.id, title: m.name, sub: (m.first_air_date || "").slice(0, 4), cover: m.poster_path ? IMG + m.poster_path : "" }; });
+        });
+      }
+      return jget("https://api.tvmaze.com/search/shows?q=" + encodeURIComponent(q)).then(function (d) {
+        return d.slice(0, 8).map(function (x) { return { src: "tvmaze", id: x.show.id, title: x.show.name, sub: (x.show.premiered || "").slice(0, 4), cover: x.show.image ? x.show.image.medium : "" }; });
+      });
+    }
+    return anilist(AL_QUERY, { q: q, t: type === "manga" ? "MANGA" : "ANIME" }).then(function (d) {
+      return ((d.Page && d.Page.media) || []).map(function (m) {
+        return { src: "anilist", id: m.id, title: m.title.english || m.title.romaji, sub: [FMT[m.format] || m.format || "", m.startDate && m.startDate.year || ""].filter(Boolean).join(" · "), cover: (m.coverImage && m.coverImage.large) || "", raw: m };
+      });
+    });
+  }
+
+  function details(type, r) {
+    if (type === "film") {
+      return tmdb("/movie/" + r.id, {}).then(function (m) {
+        return { type: "film", title: m.title || r.title, genre: normGenre(m.genres && m.genres[0] && m.genres[0].name), cover: r.cover, seasons: [], chapters: null };
+      });
+    }
+    if (type === "serie" && r.src === "tmdb") {
+      return tmdb("/tv/" + r.id, {}).then(function (t) {
+        var sl = (t.seasons || []).filter(function (s) { return s.season_number > 0 && s.episode_count > 0; });
+        return Promise.all(sl.map(function (s) { return tmdb("/tv/" + r.id + "/season/" + s.season_number, {}).catch(function () { return null; }); })).then(function (sd) {
+          var seasons = sl.map(function (s, i) {
+            var eps = (sd[i] && sd[i].episodes) || [];
+            var titles = eps.map(function (e) { return e.name || ""; });
+            return { count: titles.length || s.episode_count, titles: titles };
+          });
+          return { type: "serie", title: t.name || r.title, genre: normGenre(t.genres && t.genres[0] && t.genres[0].name), cover: r.cover, seasons: seasons, chapters: null };
+        });
+      });
+    }
+    if (type === "serie") {
+      return jget("https://api.tvmaze.com/shows/" + r.id + "?embed=episodes").then(function (s) {
+        var eps = (s._embedded && s._embedded.episodes) || [], by = {};
+        eps.forEach(function (e) { if (e.number == null) return; (by[e.season] = by[e.season] || []).push(e); });
+        var seasons = Object.keys(by).map(Number).sort(function (a, b) { return a - b; }).map(function (k) {
+          var l = by[k].sort(function (a, b) { return a.number - b.number; });
+          return { count: l.length, titles: l.map(function (e) { return e.name || ""; }) };
+        });
+        return { type: "serie", title: s.name, genre: normGenre((s.genres || []).filter(function (g) { return g !== "Anime"; })[0] || (s.genres || [])[0]), cover: s.image ? s.image.medium : r.cover, seasons: seasons, chapters: null };
+      });
+    }
+    var m = r.raw, genre = normGenre((m.genres || [])[0]);
+    if (type === "manga") {
+      return Promise.resolve({ type: "manga", title: r.title, genre: genre, cover: r.cover, seasons: [], chapters: { count: m.chapters || 0, avg: 20, titles: [] }, hint: m.chapters ? "" : "Il numero dei capitoli non è indicato (opera in corso): scrivi quanti ne hai." });
+    }
+    var map = {};
+    (m.streamingEpisodes || []).forEach(function (s) {
+      var x = /^(?:Episode|Episodio|Ep\.?)\s*(\d+)\s*[-–:.]?\s*(.*)$/i.exec(s.title || "");
+      if (x) map[+x[1]] = x[2];
+    });
+    var count = m.episodes || 0, titles = [];
+    for (var i = 1; i <= count; i++) titles.push(map[i] || "");
+    return Promise.resolve({ type: "anime", title: r.title, genre: genre, cover: r.cover, seasons: [{ count: count || 12, titles: titles }], chapters: null, hint: count ? "" : "Il numero degli episodi non è indicato (serie in corso): controlla il valore." });
+  }
+
+  function errInfo(e) {
+    if (e && e.code === "nokey") return { text: "Per cercare i film serve la chiave gratuita di TMDB.", key: true };
+    if (e && (e.code === 401 || e.code === 403)) return { text: "La chiave TMDB non è valida. Controllala nelle impostazioni.", key: true };
+    if (e && e.code === 429) return { text: "Troppe richieste: riprova tra qualche secondo.", key: false };
+    return { text: "Non riesco a contattare il database. Controlla la connessione e riprova.", key: false };
+  }
+
+  /* ---------- schermate ---------- */
+  var ICON_THEME = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>';
+  var ICON_SET = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+  function renderHead() {
+    $("#head").innerHTML = '<header class="top"><div class="brand">Mediateca</div><div class="tools"><span id="savestate" class="savestate">Solo su questo dispositivo</span>' +
+      '<button class="icon-btn" data-act="theme" aria-label="Cambia tema chiaro o scuro">' + ICON_THEME + "</button>" +
+      '<button class="icon-btn" data-act="settings" aria-label="Impostazioni e backup">' + ICON_SET + "</button>" +
+      '<button class="btn primary" data-act="add">Aggiungi</button></div></header>';
+  }
+  function filtersActive() { return state.type !== "all" || state.status !== "all" || state.q.trim() !== ""; }
+  function filtered(genre) {
+    var q = state.q.trim().toLowerCase();
+    return Array.from(state.items.values()).filter(function (it) {
+      if (genre && (it.genre || NOGENRE) !== genre) return false;
+      if (state.type !== "all" && it.type !== state.type) return false;
+      if (state.status !== "all" && statusOf(it) !== state.status) return false;
+      if (q && it.title.toLowerCase().indexOf(q) < 0 && (it.genre || "").toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+  function filtersHTML() {
+    var t = [["all", "Tutti i tipi"]].concat(TYPES).map(function (x) { return '<button class="chip" data-act="ftype" data-v="' + x[0] + '" aria-pressed="' + (state.type === x[0]) + '">' + x[1] + "</button>"; }).join("");
+    var s = STATUS.map(function (x) { return '<button class="chip" data-act="fstatus" data-v="' + x[0] + '" aria-pressed="' + (state.status === x[0]) + '">' + x[1] + "</button>"; }).join("");
+    return '<section class="filters"><div class="chips">' + t + '</div><div class="chips">' + s + "</div>" +
+      '<div class="search"><input id="q" type="search" placeholder="Cerca per titolo o genere" value="' + esc(state.q) + '" aria-label="Cerca"></div></section>';
+  }
+  function emptyHTML() {
+    return '<section class="empty"><h2>La tua mediateca è vuota</h2><p>Cerca un film, una serie, un anime o un manga: genere, copertina, stagioni ed episodi (o capitoli) si compilano da soli. Poi spunti quello che hai visto o letto.</p><button class="btn primary" data-act="add">Aggiungi il primo contenuto</button></section>';
+  }
+  function noResultsHTML() { return '<section class="empty"><h2>Nessun risultato</h2><p>Nessun contenuto corrisponde ai filtri attuali.</p><button class="btn" data-act="reset">Azzera i filtri</button></section>'; }
+  function genreCard(g, list) {
+    var cov = null;
+    for (var i = 0; i < list.length; i++) if (list[i].cover) { cov = list[i].cover; break; }
+    var art = cov ? '<div class="art" style="background-image:url(\'' + esc(cov) + '\')"></div>' : '<span class="initial">' + initial(g) + "</span>";
+    return '<button class="poster" data-act="genre" data-genre="' + esc(g) + '" style="' + grad(g) + '">' + art + '<div class="shade"></div>' +
+      '<div class="cap"><h3>' + esc(g) + '</h3><div class="meta">' + pl(list.length, "titolo", "titoli") + "<br>" + esc(aggText(agg(list))) + "</div></div></button>";
+  }
+  function itemCard(it) {
+    var s = stats(it), pct = s.total ? Math.round(s.done / s.total * 100) : 0;
+    var art = it.cover ? '<div class="art" style="background-image:url(\'' + esc(it.cover) + '\')"></div>' : '<span class="initial">' + initial(it.title) + "</span>";
+    return '<button class="poster" data-act="open" data-id="' + esc(it.id) + '" style="' + grad(it.title) + '">' + art + '<div class="shade"></div>' +
+      '<span class="tag">' + TYPE_LABEL[it.type] + '</span><div class="cap"><h3>' + esc(it.title) + '</h3><div class="meta">' + esc(remainingText(it)) +
+      '</div><div class="bar"><i style="width:' + pct + '%"></i></div></div></button>';
+  }
+  function byRecent(a, b) { return (b.lastAt || b.createdAt || 0) - (a.lastAt || a.createdAt || 0); }
+  function pickFeatured() {
+    var arr = Array.from(state.items.values());
+    var doing = arr.filter(function (it) { return statusOf(it) === "doing"; }).sort(byRecent);
+    if (doing.length) return { it: doing[0], doing: true };
+    var todo = arr.filter(function (it) { return statusOf(it) === "todo"; }).sort(byRecent);
+    if (todo.length) return { it: todo[0], doing: false };
+    return arr.length ? { it: arr.sort(byRecent)[0], doing: false } : null;
+  }
+  function heroHTML() {
+    if (filtersActive() || !state.items.size) return "";
+    var f = pickFeatured();
+    if (!f) return "";
+    var it = f.it, s = stats(it), pct = s.total ? Math.round(s.done / s.total * 100) : 0;
+    return '<section class="hero-b" aria-label="In evidenza"><div class="bd" style="' + bgStyle(it) + '"></div>' +
+      (it.cover ? '<div class="thumb hp" style="' + bgStyle(it) + '"></div>' : '<span class="initial">' + initial(it.title) + "</span>") +
+      '<div class="bdshade"></div><div class="txt"><span class="kicker">' + (f.doing ? "Continua da dove eri rimasto" : "Da iniziare") + " · " + TYPE_LABEL[it.type] + " · " + esc(it.genre || NOGENRE) + "</span>" +
+      "<h1>" + esc(it.title) + '</h1><div class="bar"><i style="width:' + pct + '%"></i></div><p class="mono">' + esc(remainingText(it)) + "</p>" +
+      '<div class="actions"><button class="btn light" data-act="open" data-id="' + esc(it.id) + '">' + (f.doing ? "Continua" : "Apri") + "</button></div></div></section>";
+  }
+  function rail(title, cards, genre) {
+    return '<section><div class="rowhead"><h2>' + esc(title) + "</h2>" + (genre ? '<button data-act="genre" data-genre="' + esc(genre) + '">Vedi tutto</button>' : "") + '</div><div class="rail">' + cards + "</div></section>";
+  }
+  function rowsHTML(list, gs, names) {
+    var h = "";
+    var doing = list.filter(function (it) { return statusOf(it) === "doing"; }).sort(byRecent);
+    if (doing.length) h += rail("Continua a guardare", doing.map(itemCard).join(""), null);
+    h += rail("I tuoi generi", names.map(function (g) { return genreCard(g, gs[g]); }).join(""), null);
+    names.forEach(function (g) {
+      var l = gs[g].slice().sort(function (a, b) { return a.title.localeCompare(b.title, "it"); });
+      h += rail(g, l.map(itemCard).join(""), g);
+    });
+    return '<div class="rails">' + h + "</div>";
+  }
+  function renderList() {
+    var box = $("#list");
+    if (!box) return;
+    if (state.screen === "home") {
+      var list = filtered(null), gs = {};
+      list.forEach(function (it) { var g = it.genre || NOGENRE; (gs[g] = gs[g] || []).push(it); });
+      var names = Object.keys(gs).sort(function (a, b) { return a.localeCompare(b, "it"); });
+      if (!names.length) box.innerHTML = noResultsHTML();
+      else if (filtersActive()) box.innerHTML = '<div class="grid">' + list.sort(function (a, b) { return a.title.localeCompare(b.title, "it"); }).map(itemCard).join("") + "</div>";
+      else box.innerHTML = rowsHTML(list, gs, names);
+    } else {
+      var l = filtered(state.genre).sort(function (a, b) { return a.title.localeCompare(b.title, "it"); });
+      box.innerHTML = l.length ? '<div class="grid">' + l.map(itemCard).join("") + "</div>" : noResultsHTML();
+    }
+  }
+
+  function seasonsHTML(it) {
+    return '<div class="stack">' + it.seasons.map(function (s, si) {
+      var done = s.eps.filter(function (e) { return e.d; }).length, closed = state.closed.has(si), rows = "";
+      if (!closed) {
+        rows = s.eps.map(function (e, ei) {
+          var n = ei + 1;
+          if (state.edit) return '<div class="row edit"><span class="no">E' + pad(n) + '</span><input class="t-in" id="ep-' + si + "-" + ei + '" data-act="eptitle" data-s="' + si + '" data-e="' + ei + '" value="' + esc(e.t) + '" placeholder="Episodio ' + n + '" aria-label="Titolo episodio ' + n + '"><button class="x" data-act="epdel" data-s="' + si + '" data-e="' + ei + '" aria-label="Elimina episodio ' + n + '">✕</button></div>';
+          return '<label class="row' + (e.d ? " done" : "") + '"><input type="checkbox" data-act="ep" data-s="' + si + '" data-e="' + ei + '"' + (e.d ? " checked" : "") + '><span class="no">E' + pad(n) + '</span><span class="t' + (e.t ? "" : " ph") + '">' + esc(e.t || "Episodio " + n) + "</span></label>";
+        }).join("");
+      }
+      var tail = state.edit && !closed ? '<div class="tail"><button class="btn small" data-act="epadd" data-s="' + si + '" data-n="1">+ 1 episodio</button><button class="btn small" data-act="epadd" data-s="' + si + '" data-n="10">+ 10 episodi</button><button class="btn small danger" data-act="sdel" data-s="' + si + '">Elimina stagione</button></div>' : "";
+      return '<section class="season"><header><button class="toggle" data-act="sopen" data-s="' + si + '" aria-expanded="' + !closed + '">Stagione ' + (si + 1) + '<span class="mono">' + done + " / " + s.eps.length + "</span></button>" +
+        (state.edit ? "" : '<button class="btn small" data-act="sall" data-s="' + si + '">' + (done === s.eps.length && s.eps.length ? "Deseleziona tutta" : "Segna tutta") + "</button>") + "</header>" + rows + tail + "</section>";
+    }).join("") + (state.edit ? '<button class="btn" data-act="sadd">+ Aggiungi stagione</button>' : "") + "</div>";
+  }
+  function chaptersHTML(it) {
+    var rows = it.chapters.map(function (c, ci) {
+      var n = ci + 1;
+      if (state.edit) return '<div class="row edit"><span class="no">Cap. ' + n + '</span><input class="t-in" id="ch-' + ci + '" data-act="chtitle" data-c="' + ci + '" value="' + esc(c.t) + '" placeholder="Capitolo ' + n + '" aria-label="Titolo capitolo ' + n + '"><input class="p-in" id="chp-' + ci + '" type="number" min="0" data-act="chpages" data-c="' + ci + '" value="' + (c.p || 0) + '" aria-label="Pagine capitolo ' + n + '"><button class="x" data-act="chdel" data-c="' + ci + '" aria-label="Elimina capitolo ' + n + '">✕</button></div>';
+      return '<label class="row' + (c.d ? " done" : "") + '"><input type="checkbox" data-act="ch" data-c="' + ci + '"' + (c.d ? " checked" : "") + '><span class="no">Cap. ' + n + '</span><span class="t' + (c.t ? "" : " ph") + '">' + esc(c.t || "Capitolo " + n) + '</span><span class="pg">' + (c.p || 0) + " p.</span></label>";
+    }).join("");
+    var tail = state.edit ? '<div class="tail"><button class="btn small" data-act="chadd" data-n="1">+ 1 capitolo</button><button class="btn small" data-act="chadd" data-n="10">+ 10 capitoli</button></div>' : "";
+    return '<section class="season"><header><span class="toggle">Capitoli<span class="mono">' + stats(it).done + " / " + it.chapters.length + "</span></span>" +
+      (state.edit ? "" : '<button class="btn small" data-act="chall">' + (stats(it).done === it.chapters.length && it.chapters.length ? "Deseleziona tutti" : "Segna tutti") + "</button>") + "</header>" + rows + tail + "</section>";
+  }
+  function editPanel(it) {
+    return '<section class="panel"><label class="f" for="etitle">Titolo<input id="etitle" data-act="f-title" value="' + esc(it.title) + '"></label>' +
+      '<label class="f" for="egenre">Genere<input id="egenre" data-act="f-genre" list="glist2" value="' + esc(it.genre) + '"></label><datalist id="glist2">' + genreOptions() + "</datalist>" +
+      '<div class="row-actions"><label class="btn small" for="ecover">Cambia copertina</label><input id="ecover" type="file" accept="image/*" hidden>' +
+      (it.cover ? '<button class="btn small" data-act="rmcover">Togli copertina</button>' : "") +
+      (state.confirmDel ? '<button class="btn small danger" data-act="delyes">Conferma eliminazione</button><button class="btn small" data-act="delno">Annulla</button>' : '<button class="btn small danger" data-act="del">Elimina contenuto</button>') + "</div></section>";
+  }
+  function itemHTML(it) {
+    var s = stats(it), pct = s.total ? Math.round(s.done / s.total * 100) : 0;
+    var unit = it.type === "manga" ? "capitoli" : (it.type === "film" ? "film" : "episodi");
+    var body = it.type === "film"
+      ? '<label class="bigcheck"><input type="checkbox" data-act="film"' + (it.done ? " checked" : "") + "><span>" + (it.done ? "Visto" : "Da vedere") + "</span></label>"
+      : (it.type === "manga" ? chaptersHTML(it) : seasonsHTML(it));
+    return '<button class="back" data-act="back">← ' + esc(state.genre || "Tutti i generi") + "</button>" +
+      '<section class="hero banner"><div class="bd" style="' + bgStyle(it) + '"></div><div class="bdshade"></div><div class="thumb" style="' + bgStyle(it) + '">' + (it.cover ? "" : '<span class="initial">' + initial(it.title) + "</span>") + "</div>" +
+      '<div class="info"><span class="kicker">' + TYPE_LABEL[it.type] + " · " + esc(it.genre || NOGENRE) + "</span><h1>" + esc(it.title) + "</h1>" +
+      '<div class="bar s"><i style="width:' + pct + '%"></i></div><p class="mono">' + s.done + " / " + s.total + " " + unit + " · " + esc(remainingText(it)) + "</p>" +
+      '<div class="actions"><button class="btn small" data-act="edit">' + (state.edit ? "Fine modifica" : "Modifica") + "</button></div></div></section>" +
+      (state.edit ? editPanel(it) : "") + body;
+  }
+  function render(top) {
+    var m = $("#main");
+    if (!m) return;
+    var y = window.scrollY;
+    if (state.screen === "item" && !state.items.get(state.id)) { state.screen = state.genre ? "genre" : "home"; state.edit = false; }
+    if (state.screen === "genre" && !Array.from(state.items.values()).some(function (i) { return (i.genre || NOGENRE) === state.genre; })) { state.screen = "home"; state.genre = null; }
+    if (state.screen === "item") m.innerHTML = itemHTML(state.items.get(state.id));
+    else if (!state.items.size) m.innerHTML = emptyHTML();
+    else if (state.screen === "genre") { m.innerHTML = '<button class="back" data-act="back">← Tutti i generi</button><div class="title-row"><h1>' + esc(state.genre) + "</h1></div>" + filtersHTML() + '<div id="list"></div>'; renderList(); }
+    else { m.innerHTML = heroHTML() + filtersHTML() + '<div id="list"></div>'; renderList(); }
+    window.scrollTo(0, top ? 0 : y);
+  }
+  function go(screen, opts) {
+    opts = opts || {};
+    state.screen = screen;
+    if ("genre" in opts) state.genre = opts.genre;
+    if ("id" in opts) state.id = opts.id;
+    state.edit = false; state.confirmDel = false; state.closed = new Set();
+    render(true);
+  }
+
+  /* ---------- finestra: aggiungi e impostazioni ---------- */
+  function showSheet() { $("#sheetbg").hidden = false; renderSheet(); }
+  function closeSheet() { state.sheet = null; $("#sheetbg").hidden = true; }
+  function openAdd() { state.sheet = { mode: "add", step: 1, type: "serie", q: "", results: [], msg: null, loading: false, tok: 0, draft: null, loadingD: false, err: "" }; showSheet(); }
+  function openSettings() { state.sheet = { mode: "settings", msg: "" }; showSheet(); }
+
+  function sourceLabel(type) {
+    if (type === "film") return "TMDB";
+    if (type === "serie") return tmdbKey() ? "TMDB" : "TVmaze";
+    return "AniList";
+  }
+  function step1HTML(s) {
+    var chips = TYPES.map(function (t) { return '<button type="button" class="chip" data-act="stype" data-v="' + t[0] + '" aria-pressed="' + (s.type === t[0]) + '">' + t[1] + "</button>"; }).join("");
+    return '<div class="sheet-head"><h2>Aggiungi un contenuto</h2><button type="button" class="icon-btn" data-act="closeSheet" aria-label="Chiudi">✕</button></div>' +
+      '<div class="chips">' + chips + "</div>" +
+      '<label class="f" for="sq">Cerca il titolo<input id="sq" type="search" autocomplete="off" placeholder="Per esempio ' + (s.type === "manga" ? "One Piece" : s.type === "anime" ? "Death Note" : s.type === "film" ? "Inception" : "Breaking Bad") + '" value="' + esc(s.q) + '"></label>' +
+      '<p class="note">Fonte: ' + sourceLabel(s.type) + '. Genere, copertina e ' + (s.type === "manga" ? "capitoli" : s.type === "film" ? "genere" : "episodi") + ' si compilano da soli.</p>' +
+      '<div id="results" class="results" aria-live="polite"></div>' +
+      '<div class="sheet-actions"><button type="button" class="btn" data-act="manual">Non lo trovi? Inseriscilo a mano</button></div>';
+  }
+  function renderResults() {
+    var s = state.sheet, box = $("#results");
+    if (!s || !box || s.mode !== "add" || s.step !== 1) return;
+    var h = "";
+    if (s.msg) h += '<p class="err">' + esc(s.msg.text) + "</p>" + (s.msg.key ? '<div><button type="button" class="btn small" data-act="settings">Apri le impostazioni</button></div>' : "");
+    if (s.loading) h += '<p class="note">Cerco…</p>';
+    else if (!s.q.trim() && !s.msg) h += '<p class="note">Scrivi il titolo per vedere i risultati.</p>';
+    else if (!s.results.length && !s.msg) h += '<p class="note">Nessun risultato. Prova un altro titolo o inseriscilo a mano.</p>';
+    h += s.results.map(function (r, i) {
+      return '<button type="button" class="res" data-act="pick" data-i="' + i + '">' + (r.cover ? '<img src="' + esc(r.cover) + '" alt="" loading="lazy">' : '<span class="ph">' + initial(r.title) + "</span>") +
+        '<span class="tx"><b>' + esc(r.title) + "</b><span>" + esc(r.sub || " ") + "</span></span></button>";
+    }).join("");
+    box.innerHTML = h;
+  }
+  var searchTimer = null;
+  function onSearch(v) {
+    var s = state.sheet;
+    if (!s || s.mode !== "add") return;
+    s.q = v; s.msg = null;
+    clearTimeout(searchTimer);
+    var tok = ++s.tok;
+    if (!v.trim()) { s.results = []; s.loading = false; renderResults(); return; }
+    s.loading = true; renderResults();
+    searchTimer = setTimeout(function () {
+      searchTitles(s.type, v.trim()).then(function (r) {
+        if (state.sheet !== s || tok !== s.tok) return;
+        s.results = r; s.loading = false; s.msg = null; renderResults();
+      }).catch(function (e) {
+        if (state.sheet !== s || tok !== s.tok) return;
+        s.results = []; s.loading = false; s.msg = errInfo(e); renderResults();
+      });
+    }, 400);
+  }
+  function pick(i) {
+    var s = state.sheet, r = s.results[i];
+    if (!r) return;
+    s.step = 2; s.draft = null; s.loadingD = true; s.err = ""; renderSheet();
+    details(s.type, r).then(function (d) {
+      if (state.sheet !== s) return;
+      s.draft = d; s.loadingD = false; renderSheet();
+    }).catch(function (e) {
+      if (state.sheet !== s) return;
+      s.loadingD = false; s.step = 1; s.msg = errInfo(e); renderSheet();
+    });
+  }
+  function manualDraft(type, title) {
+    return { type: type, title: title || "", genre: "", cover: "", seasons: type === "film" || type === "manga" ? [] : [{ count: 12, titles: [] }], chapters: type === "manga" ? { count: 100, avg: 20, titles: [] } : null, hint: "" };
+  }
+  function step2HTML(s) {
+    var head = '<div class="sheet-head"><h2>Conferma i dati</h2><button type="button" class="icon-btn" data-act="closeSheet" aria-label="Chiudi">✕</button></div>';
+    if (s.loadingD || !s.draft) return head + '<p class="note">Carico i dettagli…</p>';
+    var d = s.draft, h = head;
+    if (d.cover) h += '<div class="preview"><img src="' + esc(d.cover) + '" alt="Copertina"><span class="kicker">' + TYPE_LABEL[d.type] + "</span></div>";
+    h += '<label class="f" for="d-title">Titolo<input id="d-title" type="text" data-d="title" value="' + esc(d.title) + '"></label>' +
+      '<label class="f" for="d-genre">Genere<input id="d-genre" type="text" data-d="genre" list="glist" value="' + esc(d.genre) + '" placeholder="Per esempio Azione"></label><datalist id="glist">' + genreOptions() + "</datalist>";
+    if (d.hint) h += '<p class="note">' + esc(d.hint) + "</p>";
+    if (d.type === "film") h += '<p class="note">Un film si segna come visto con un tocco.</p>';
+    else if (d.type === "manga") {
+      h += '<div class="srow"><label class="f" for="d-ch">Capitoli<input id="d-ch" type="number" min="1" data-d="ch" value="' + d.chapters.count + '"></label><label class="f" for="d-avg">Pagine per capitolo<input id="d-avg" type="number" min="0" data-d="avg" value="' + d.chapters.avg + '"></label></div>' +
+        '<p class="note">I database non indicano le pagine: il valore è una stima, che puoi correggere capitolo per capitolo da Modifica.</p>';
+    } else {
+      h += d.seasons.map(function (sn, i) {
+        return '<div class="srow"><span>Stagione ' + (i + 1) + '</span><input class="num" id="d-s' + i + '" type="number" min="1" data-d="season" data-i="' + i + '" value="' + sn.count + '" aria-label="Episodi stagione ' + (i + 1) + '"><span>episodi</span>' +
+          (d.seasons.length > 1 ? '<button type="button" class="x" data-act="srem" data-i="' + i + '" aria-label="Rimuovi stagione ' + (i + 1) + '">✕</button>' : "") + "</div>";
+      }).join("") + '<div><button type="button" class="btn small" data-act="sseason">+ Aggiungi stagione</button></div>';
+    }
+    h += '<p id="d-err" class="err" role="alert">' + esc(s.err) + "</p>" +
+      '<div class="sheet-actions"><button type="button" class="btn" data-act="back1">Indietro</button><button type="button" class="btn primary" data-act="create">Aggiungi alla mediateca</button></div>';
+    return h;
+  }
+  function settingsHTML() {
+    var s = state.sheet, has = !!tmdbKey();
+    return '<div class="sheet-head"><h2>Impostazioni</h2><button type="button" class="icon-btn" data-act="closeSheet" aria-label="Chiudi">✕</button></div>' +
+      '<section class="panel"><strong>Chiave TMDB</strong><p class="note">Serve per cercare i film e per avere i titoli delle serie in italiano. È gratuita: la chiave resta salvata solo su questo dispositivo. Senza chiave funzionano serie (TVmaze), anime e manga (AniList).</p>' +
+      '<label class="f" for="tkey">Chiave API (v3) o token di lettura<input id="tkey" type="password" autocomplete="off" value="' + esc(tmdbKey()) + '" placeholder="Incolla qui la chiave"></label>' +
+      '<div class="row-actions"><button type="button" class="btn small primary" data-act="savekey">Salva</button><button type="button" class="btn small" data-act="testkey">Prova la chiave</button>' + (has ? '<button type="button" class="btn small danger" data-act="rmkey">Rimuovi</button>' : "") + "</div>" +
+      '<p id="smsg" class="note" role="status">' + esc(s.msg || "") + "</p></section>" +
+      '<section class="panel"><strong>Backup</strong><p class="note">I dati sono salvati nel browser di questo dispositivo. Esporta un file di backup per tenerli al sicuro o per spostarli su un altro dispositivo.</p>' +
+      '<div class="row-actions"><button type="button" class="btn small" data-act="export">Esporta backup</button><label class="btn small" for="imp">Importa backup</label><input id="imp" type="file" accept="application/json,.json" hidden></div></section>';
+  }
+  function renderSheet() {
+    var s = state.sheet;
+    if (!s) return;
+    $("#sheet").innerHTML = s.mode === "settings" ? settingsHTML() : (s.step === 1 ? step1HTML(s) : step2HTML(s));
+    if (s.mode === "add" && s.step === 1) { renderResults(); var q = $("#sq"); if (q) setTimeout(function () { q.focus(); }, 30); }
+  }
+  function setSMsg(t) { if (state.sheet) state.sheet.msg = t; var el = $("#smsg"); if (el) el.textContent = t; }
+
+  function buildItem(d) {
+    var it = { id: uid(), type: d.type, title: d.title.trim(), genre: d.genre.trim() || NOGENRE, cover: d.cover || "", createdAt: Date.now(), lastAt: Date.now() };
+    if (d.type === "film") { it.done = 0; return it; }
+    if (d.type === "manga") {
+      var count = Math.min(Math.max(parseInt(d.chapters.count, 10) || 0, 0), 5000), avg = Math.max(parseInt(d.chapters.avg, 10) || 0, 0);
+      if (!count) return null;
+      it.chapters = [];
+      for (var i = 0; i < count; i++) it.chapters.push({ t: (d.chapters.titles[i] || "").trim(), p: avg, d: 0 });
+      return it;
+    }
+    var src = d.seasons.map(function (s) { return { count: Math.min(Math.max(parseInt(s.count, 10) || 0, 0), 3000), titles: s.titles || [] }; }).filter(function (s) { return s.count > 0; });
+    if (!src.length) return null;
+    it.seasons = src.map(function (s) { var eps = []; for (var i = 0; i < s.count; i++) eps.push({ t: (s.titles[i] || "").trim(), d: 0 }); return { eps: eps }; });
+    return it;
+  }
+
+  function readCover(file) {
+    return new Promise(function (res, rej) {
+      var fr = new FileReader();
+      fr.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var W = 360, H = 480, c = document.createElement("canvas");
+          c.width = W; c.height = H;
+          var x = c.getContext("2d"), sc = Math.max(W / img.width, H / img.height), w = img.width * sc, h = img.height * sc;
+          x.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+          res(c.toDataURL("image/jpeg", 0.8));
+        };
+        img.onerror = rej; img.src = fr.result;
+      };
+      fr.onerror = rej; fr.readAsDataURL(file);
+    });
+  }
+  function exportBackup() {
+    var data = { app: "mediateca", version: 2, items: Array.from(state.items.values()) };
+    var blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    var a = document.createElement("a");
+    var dt = new Date();
+    a.href = URL.createObjectURL(blob);
+    a.download = "mediateca-backup-" + dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()) + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  }
+  function importBackup(file) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      try {
+        var j = JSON.parse(fr.result), arr = Array.isArray(j) ? j : j.items, n = 0;
+        if (!Array.isArray(arr)) throw new Error("formato");
+        arr.forEach(function (d) { if (d && d.id && d.type && d.title && (d.type === "film" || d.seasons || d.chapters)) { state.items.set(d.id, d); n++; } });
+        persist(); render();
+        setSMsg("Importati " + pl(n, "titolo", "titoli") + ".");
+      } catch (e) { setSMsg("Il file non è un backup valido."); }
+    };
+    fr.readAsText(file);
+  }
+
+  /* ---------- azioni ---------- */
+  function cur() { return state.items.get(state.id); }
+  function change(it) { touch(it); render(); }
+
+  document.addEventListener("click", function (ev) {
+    var el = ev.target.closest("[data-act]");
+    if (!el) return;
+    var a = el.getAttribute("data-act"), ds = el.dataset, it, s, sh = state.sheet;
+    switch (a) {
+      case "theme": toggleTheme(); break;
+      case "add": openAdd(); break;
+      case "settings": openSettings(); break;
+      case "closeSheet": closeSheet(); break;
+      case "stype":
+        sh.type = ds.v; sh.results = []; sh.msg = null; renderSheet();
+        if (sh.q.trim()) onSearch(sh.q);
+        break;
+      case "pick": pick(+ds.i); break;
+      case "manual": sh.step = 2; sh.draft = manualDraft(sh.type, sh.q.trim()); sh.err = ""; renderSheet(); break;
+      case "back1": sh.step = 1; sh.draft = null; renderSheet(); break;
+      case "sseason": sh.draft.seasons.push({ count: 12, titles: [] }); renderSheet(); break;
+      case "srem": sh.draft.seasons.splice(+ds.i, 1); renderSheet(); break;
+      case "create":
+        var d = sh.draft;
+        if (!d.title.trim()) { sh.err = "Scrivi il titolo."; $("#d-err").textContent = sh.err; $("#d-title").focus(); break; }
+        var created = buildItem(d);
+        if (!created) { sh.err = d.type === "manga" ? "Indica almeno un capitolo." : "Indica almeno un episodio."; $("#d-err").textContent = sh.err; break; }
+        state.items.set(created.id, created); persist(); closeSheet();
+        go("item", { id: created.id, genre: created.genre });
+        break;
+      case "savekey": lsSet(KEY_TMDB, ($("#tkey").value || "").trim()); setSMsg("Chiave salvata."); break;
+      case "rmkey": try { localStorage.removeItem(KEY_TMDB); } catch (e) {} renderSheet(); setSMsg("Chiave rimossa."); break;
+      case "testkey":
+        lsSet(KEY_TMDB, ($("#tkey").value || "").trim());
+        setSMsg("Provo la chiave…");
+        tmdb("/configuration", {}).then(function () { setSMsg("La chiave funziona."); }).catch(function (e) { setSMsg(e && e.code === "nokey" ? "Incolla prima la chiave." : (e && (e.code === 401 || e.code === 403) ? "Chiave non valida." : "Non riesco a contattare TMDB.")); });
+        break;
+      case "export": exportBackup(); break;
+      case "ftype": state.type = ds.v; render(); break;
+      case "fstatus": state.status = ds.v; render(); break;
+      case "reset": state.type = "all"; state.status = "all"; state.q = ""; render(); break;
+      case "genre": go("genre", { genre: ds.genre }); break;
+      case "open": go("item", { id: ds.id }); break;
+      case "back":
+        if (state.screen === "genre") go("home", { genre: null });
+        else go(state.genre ? "genre" : "home");
+        break;
+      case "edit":
+        state.edit = !state.edit; state.confirmDel = false;
+        if (!state.edit && (it = cur())) { if (!it.title.trim()) it.title = "Senza titolo"; if (!it.genre.trim()) it.genre = NOGENRE; touch(it); }
+        render(); break;
+      case "sopen": s = +ds.s; if (state.closed.has(s)) state.closed.delete(s); else state.closed.add(s); render(); break;
+      case "sall": it = cur(); s = it.seasons[+ds.s]; var all = s.eps.length && s.eps.every(function (x) { return x.d; }); s.eps.forEach(function (x) { x.d = all ? 0 : 1; }); change(it); break;
+      case "chall": it = cur(); var allc = it.chapters.length && it.chapters.every(function (x) { return x.d; }); it.chapters.forEach(function (x) { x.d = allc ? 0 : 1; }); change(it); break;
+      case "epadd": it = cur(); s = it.seasons[+ds.s]; for (var i = 0; i < +ds.n; i++) s.eps.push({ t: "", d: 0 }); change(it); break;
+      case "epdel": it = cur(); it.seasons[+ds.s].eps.splice(+ds.e, 1); change(it); break;
+      case "sadd": it = cur(); it.seasons.push({ eps: [{ t: "", d: 0 }] }); change(it); break;
+      case "sdel": it = cur(); it.seasons.splice(+ds.s, 1); change(it); break;
+      case "chadd":
+        it = cur();
+        var avg = it.chapters.length ? Math.round(it.chapters.reduce(function (acc, c) { return acc + (c.p || 0); }, 0) / it.chapters.length) : 20;
+        for (var j = 0; j < +ds.n; j++) it.chapters.push({ t: "", p: avg, d: 0 });
+        change(it); break;
+      case "chdel": it = cur(); it.chapters.splice(+ds.c, 1); change(it); break;
+      case "rmcover": it = cur(); it.cover = ""; change(it); break;
+      case "del": state.confirmDel = true; render(); break;
+      case "delno": state.confirmDel = false; render(); break;
+      case "delyes":
+        it = cur(); state.items.delete(it.id); persist();
+        if (state.genre && Array.from(state.items.values()).some(function (x) { return x.genre === state.genre; })) go("genre");
+        else go("home", { genre: null });
+        break;
+    }
+  });
+
+  document.addEventListener("change", function (ev) {
+    var t = ev.target, a = t.getAttribute && t.getAttribute("data-act"), it;
+    if (t.id === "ecover" && t.files && t.files[0]) {
+      readCover(t.files[0]).then(function (url) { var x = cur(); if (!x) return; x.cover = url; change(x); }).catch(function () {});
+      return;
+    }
+    if (t.id === "imp" && t.files && t.files[0]) { importBackup(t.files[0]); return; }
+    if (a === "ep") { it = cur(); it.seasons[+t.dataset.s].eps[+t.dataset.e].d = t.checked ? 1 : 0; change(it); }
+    else if (a === "ch") { it = cur(); it.chapters[+t.dataset.c].d = t.checked ? 1 : 0; change(it); }
+    else if (a === "film") { it = cur(); it.done = t.checked ? 1 : 0; change(it); }
+  });
+
+  document.addEventListener("input", function (ev) {
+    var t = ev.target, a = t.getAttribute && t.getAttribute("data-act"), dk = t.getAttribute && t.getAttribute("data-d"), it, sh = state.sheet;
+    if (t.id === "q") {
+      state.q = t.value; renderList();
+      var hb = $(".hero-b"); if (hb) hb.hidden = filtersActive();
+      return;
+    }
+    if (t.id === "sq") { onSearch(t.value); return; }
+    if (dk && sh && sh.draft) {
+      var d = sh.draft;
+      if (dk === "title") d.title = t.value;
+      else if (dk === "genre") d.genre = t.value;
+      else if (dk === "ch") d.chapters.count = t.value;
+      else if (dk === "avg") d.chapters.avg = t.value;
+      else if (dk === "season") d.seasons[+t.dataset.i].count = t.value;
+      return;
+    }
+    if (!a) return;
+    it = cur();
+    if (!it) return;
+    if (a === "f-title") it.title = t.value;
+    else if (a === "f-genre") it.genre = t.value;
+    else if (a === "eptitle") it.seasons[+t.dataset.s].eps[+t.dataset.e].t = t.value;
+    else if (a === "chtitle") it.chapters[+t.dataset.c].t = t.value;
+    else if (a === "chpages") it.chapters[+t.dataset.c].p = Math.max(parseInt(t.value, 10) || 0, 0);
+    else return;
+    touch(it);
+  });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && state.sheet) closeSheet(); });
+  $("#sheetbg").addEventListener("mousedown", function (ev) { if (ev.target.id === "sheetbg") closeSheet(); });
+
+  applyTheme();
+  loadItems();
+  renderHead();
+  render();
+})();
+</script>
+</body>
+</html>
