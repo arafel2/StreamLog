@@ -253,6 +253,25 @@ label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); font-we
 .sug h3 { font: 400 34px/1 var(--font-display); overflow-wrap: anywhere; }
 .foot { max-width: 1000px; margin-inline: auto; border-top: 1px solid var(--line); padding-block: 16px 100px; font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
 .foot p { margin: 0; max-width: 70ch; }
+details.tendina { background: var(--bg); border: 1px solid var(--line); border-radius: 16px; }
+details.tendina > summary, .tl details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+details.tendina > summary::-webkit-details-marker, .tl details > summary::-webkit-details-marker { display: none; }
+details.tendina > summary { padding: 14px; font-weight: 600; }
+details.tendina > summary::after, .tl details > summary::after { content: "▾"; color: var(--muted); flex: none; }
+details[open] > summary::after { content: "▴"; }
+.tl { padding: 0 14px 12px; display: grid; gap: 10px; }
+.tl details { border-top: 1px solid var(--line); padding-top: 10px; }
+.tl details > summary { font-weight: 500; }
+.tl ol { margin: 10px 0 0; padding-left: 30px; color: var(--muted); font-size: 14px; display: grid; gap: 4px; }
+.tl li { overflow-wrap: anywhere; }
+.pv-title { font: 400 30px/1 var(--font-display); overflow-wrap: anywhere; }
+.pv-ph { width: 64px; aspect-ratio: 3 / 4; border-radius: 10px; flex: none; }
+.preview > div { min-width: 0; display: grid; gap: 4px; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 30; max-width: calc(100% - 32px);
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px)); padding: 11px 20px; border-radius: 999px;
+  background: var(--ink); color: var(--bg); font: 600 15px var(--font-body); text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
 datalist { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .poster { transition: transform .15s ease; }
@@ -290,6 +309,7 @@ datalist { display: none; }
 <button id="fab" class="fab" data-act="add" aria-label="Aggiungi un contenuto" hidden>
   <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>
 </button>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <div id="sheetbg" class="sheet-bg" hidden><div id="sheet" class="sheet" role="dialog" aria-modal="true"></div></div>
 
 <script>
@@ -483,7 +503,7 @@ datalist { display: none; }
     }
     var m = r.raw, genre = normGenre((m.genres || [])[0]);
     if (type === "manga") {
-      return Promise.resolve({ type: "manga", title: r.title, genre: genre, cover: r.cover, seasons: [], chapters: { count: m.chapters || 0, avg: 20, titles: [] }, hint: m.chapters ? "" : "Il numero dei capitoli non è indicato (opera in corso): scrivi quanti ne hai." });
+      return Promise.resolve({ type: "manga", title: r.title, genre: genre, cover: r.cover, seasons: [], chapters: { count: m.chapters || 0, avg: 20, titles: [] }, needCount: !m.chapters, hint: m.chapters ? "" : "Il numero dei capitoli non è indicato (opera in corso): scrivi quanti ne hai." });
     }
     var map = {};
     (m.streamingEpisodes || []).forEach(function (s) {
@@ -492,7 +512,7 @@ datalist { display: none; }
     });
     var count = m.episodes || 0, titles = [];
     for (var i = 1; i <= count; i++) titles.push(map[i] || "");
-    return Promise.resolve({ type: "anime", title: r.title, genre: genre, cover: r.cover, seasons: [{ count: count || 12, titles: titles }], chapters: null, hint: count ? "" : "Il numero degli episodi non è indicato (serie in corso): controlla il valore." });
+    return Promise.resolve({ type: "anime", title: r.title, genre: genre, cover: r.cover, seasons: [{ count: count || 12, titles: titles }], chapters: null, needCount: !count, hint: count ? "" : "Il numero degli episodi non è indicato (serie in corso): controlla il valore." });
   }
 
   function errInfo(e) {
@@ -515,12 +535,24 @@ datalist { display: none; }
       '<button class="round" data-act="settings" aria-label="Impostazioni e backup">' + ICON_BOOK + "</button>" +
       '<button class="round hot" data-act="suggest" aria-label="Cosa guardo stasera">' + ICON_SPARK + "</button></div></header>";
   }
-  function showView(v) {
+  var navOK = !!(window.history && history.pushState);
+  function snap() { return { view: state.view, screen: state.screen, genre: state.genre, id: state.id }; }
+  function pushNav() { if (!navOK) return; try { history.pushState(snap(), ""); } catch (e) { navOK = false; } }
+  function showViewRaw(v) {
     state.view = v;
     $("#landing").hidden = v !== "landing";
     $("#app").hidden = v !== "app";
     $("#fab").hidden = v !== "app";
     window.scrollTo(0, 0);
+  }
+  function showView(v) { showViewRaw(v); pushNav(); }
+  var toastT = null;
+  function toast(msg) {
+    var el = $("#toast");
+    if (!el) return;
+    el.textContent = msg; el.hidden = false;
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { el.hidden = true; }, 3200);
   }
   function filtersActive() { return state.type !== "all" || state.status !== "all" || state.q.trim() !== ""; }
   function filtered(genre) {
@@ -636,6 +668,7 @@ datalist { display: none; }
     if ("id" in opts) state.id = opts.id;
     state.edit = false; state.confirmDel = false; state.closed = new Set();
     render(true);
+    if (!opts.noPush) pushNav();
   }
 
   /* ---------- finestre: aggiungi, suggerimento, impostazioni ---------- */
@@ -715,6 +748,10 @@ datalist { display: none; }
     s.step = 2; s.draft = null; s.loadingD = true; s.err = ""; renderSheet();
     details(s.type, r).then(function (d) {
       if (state.sheet !== s) return;
+      if ((d.type === "serie" || d.type === "anime") && (!d.seasons || !d.seasons.length)) {
+        d.seasons = [{ count: 12, titles: [] }]; d.needCount = true;
+        d.hint = "Non ho trovato gli episodi di questo titolo: inserisci tu il numero.";
+      }
       s.draft = d; s.loadingD = false; renderSheet();
     }).catch(function (e) {
       if (state.sheet !== s) return;
@@ -722,25 +759,44 @@ datalist { display: none; }
     });
   }
   function manualDraft(type, title) {
-    return { type: type, title: title || "", genre: "", cover: "", seasons: type === "film" || type === "manga" ? [] : [{ count: 12, titles: [] }], chapters: type === "manga" ? { count: 100, avg: 20, titles: [] } : null, hint: "" };
+    return { manual: true, type: type, title: title || "", genre: "", cover: "", seasons: type === "film" || type === "manga" ? [] : [{ count: 12, titles: [] }], chapters: type === "manga" ? { count: 100, avg: 20, titles: [] } : null, hint: "" };
+  }
+  function tendinaHTML(d) {
+    var tot = d.seasons.reduce(function (acc, sn) { return acc + sn.count; }, 0);
+    var inner = d.seasons.map(function (sn, i) {
+      var li = "";
+      for (var k = 0; k < sn.count; k++) li += "<li>" + esc((sn.titles && sn.titles[k]) || "Episodio " + (k + 1)) + "</li>";
+      return "<details><summary>Stagione " + (i + 1) + " · " + pl(sn.count, "episodio", "episodi") + "</summary><ol>" + li + "</ol></details>";
+    }).join("");
+    return '<details class="tendina"><summary>' + pl(d.seasons.length, "stagione", "stagioni") + " · " + pl(tot, "episodio", "episodi") + '</summary><div class="tl">' + inner + "</div></details>";
   }
   function step2HTML(s) {
     var head = '<div class="sheet-head"><h2>Conferma i dati</h2><button type="button" class="icon-btn" data-act="closeSheet" aria-label="Chiudi">✕</button></div>';
     if (s.loadingD || !s.draft) return head + '<p class="note">Carico i dettagli…</p>';
-    var d = s.draft, h = head;
-    if (d.cover) h += '<div class="preview"><img src="' + esc(d.cover) + '" alt="Copertina"><span class="kicker">' + TYPE_LABEL[d.type] + "</span></div>";
-    h += '<label class="f" for="d-title">Titolo<input id="d-title" type="text" data-d="title" value="' + esc(d.title) + '"></label>' +
-      '<label class="f" for="d-genre">Genere<input id="d-genre" type="text" data-d="genre" list="glist" value="' + esc(d.genre) + '" placeholder="Per esempio Azione"></label><datalist id="glist">' + genreOptions() + "</datalist>";
+    var d = s.draft, h = head, edit = !!(d.manual || d.needCount);
+    if (d.manual) {
+      h += '<label class="f" for="d-title">Titolo<input id="d-title" type="text" data-d="title" value="' + esc(d.title) + '"></label>';
+    } else {
+      h += '<div class="preview">' + (d.cover ? '<img src="' + esc(d.cover) + '" alt="Copertina">' : '<div class="pv-ph" style="' + grad(d.title) + '"></div>') +
+        '<div><span class="kicker">' + TYPE_LABEL[d.type] + '</span><h3 class="pv-title">' + esc(d.title) + "</h3></div></div>";
+    }
+    h += '<label class="f" for="d-genre">Genere<input id="d-genre" type="text" data-d="genre" list="glist" value="' + esc(d.genre) + '" placeholder="Per esempio Azione"></label><datalist id="glist">' + genreOptions() + "</datalist>";
     if (d.hint) h += '<p class="note">' + esc(d.hint) + "</p>";
     if (d.type === "film") h += '<p class="note">Un film si segna come visto con un tocco.</p>';
     else if (d.type === "manga") {
-      h += '<div class="srow"><label class="f" for="d-ch">Capitoli<input id="d-ch" type="number" min="1" data-d="ch" value="' + d.chapters.count + '"></label><label class="f" for="d-avg">Pagine per capitolo<input id="d-avg" type="number" min="0" data-d="avg" value="' + d.chapters.avg + '"></label></div>' +
-        '<p class="note">I database non indicano le pagine: il valore è una stima, che puoi correggere capitolo per capitolo da Modifica.</p>';
-    } else {
+      if (edit) {
+        h += '<div class="srow"><label class="f" for="d-ch">Capitoli<input id="d-ch" type="number" min="1" data-d="ch" value="' + d.chapters.count + '"></label><label class="f" for="d-avg">Pagine per capitolo<input id="d-avg" type="number" min="0" data-d="avg" value="' + d.chapters.avg + '"></label></div>' +
+          '<p class="note">I database non indicano le pagine: il valore è una stima, che puoi correggere capitolo per capitolo da Modifica.</p>';
+      } else {
+        h += '<p class="note"><strong>' + pl(d.chapters.count, "capitolo", "capitoli") + "</strong>, circa " + pl(d.chapters.avg, "pagina", "pagine") + " ciascuno (stima, correggibile da Modifica).</p>";
+      }
+    } else if (edit) {
       h += d.seasons.map(function (sn, i) {
         return '<div class="srow"><span>Stagione ' + (i + 1) + '</span><input class="num" id="d-s' + i + '" type="number" min="1" data-d="season" data-i="' + i + '" value="' + sn.count + '" aria-label="Episodi stagione ' + (i + 1) + '"><span>episodi</span>' +
           (d.seasons.length > 1 ? '<button type="button" class="x" data-act="srem" data-i="' + i + '" aria-label="Rimuovi stagione ' + (i + 1) + '">✕</button>' : "") + "</div>";
       }).join("") + '<div><button type="button" class="btn small" data-act="sseason">+ Aggiungi stagione</button></div>';
+    } else {
+      h += tendinaHTML(d);
     }
     h += '<p id="d-err" class="err" role="alert">' + esc(s.err) + "</p>" +
       '<div class="sheet-actions"><button type="button" class="btn" data-act="back1">Indietro</button><button type="button" class="btn primary" data-act="create">Aggiungi alla libreria</button></div>';
@@ -831,14 +887,14 @@ datalist { display: none; }
     if (!el) return;
     var a = el.getAttribute("data-act"), ds = el.dataset, it, s, sh = state.sheet;
     switch (a) {
-      case "enter": showView("app"); render(true); break;
+      case "enter": showViewRaw("app"); state.screen = "home"; state.genre = null; render(true); pushNav(); break;
       case "landing": showView("landing"); break;
       case "theme": toggleTheme(); break;
       case "add": openAdd(); break;
       case "settings": openSettings(); break;
       case "suggest": openSuggest(); break;
       case "another": sh.pick = suggestPick(sh.pick && sh.pick.id); renderSheet(); break;
-      case "opensug": var pk = sh.pick; closeSheet(); if (pk) go("item", { id: pk.id, genre: null }); break;
+      case "opensug": var pk = sh.pick; closeSheet(); if (pk) { state.q = ""; go("item", { id: pk.id, genre: null }); } break;
       case "closeSheet": closeSheet(); break;
       case "stype":
         sh.type = ds.v; sh.results = []; sh.msg = null; renderSheet();
@@ -855,8 +911,11 @@ datalist { display: none; }
         var created = buildItem(d);
         if (!created) { sh.err = d.type === "manga" ? "Indica almeno un capitolo." : "Indica almeno un episodio."; $("#d-err").textContent = sh.err; break; }
         state.items.set(created.id, created); persist(); closeSheet();
-        showView("app");
-        go("item", { id: created.id, genre: created.genre });
+        var wasHome = state.view === "app" && state.screen === "home";
+        state.type = "all"; state.status = "all"; state.q = "";
+        showViewRaw("app");
+        go("home", { genre: null, noPush: wasHome });
+        toast("Aggiunto alla libreria: " + created.title);
         break;
       case "savekey": lsSet(KEY_TMDB, ($("#tkey").value || "").trim()); setSMsg("Chiave salvata."); break;
       case "rmkey": try { localStorage.removeItem(KEY_TMDB); } catch (e) {} renderSheet(); setSMsg("Chiave rimossa."); break;
@@ -870,9 +929,10 @@ datalist { display: none; }
       case "fstatus": state.status = ds.v; render(); break;
       case "reset": state.type = "all"; state.status = "all"; state.q = ""; render(); break;
       case "genre": go("genre", { genre: ds.genre }); break;
-      case "open": go("item", { id: ds.id }); break;
+      case "open": state.q = ""; go("item", { id: ds.id }); break;
       case "back":
-        if (state.screen === "genre") go("home", { genre: null });
+        if (navOK && history.length > 1) history.back();
+        else if (state.screen === "genre") go("home", { genre: null });
         else go(state.genre ? "genre" : "home");
         break;
       case "edit":
@@ -946,10 +1006,21 @@ datalist { display: none; }
   document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && state.sheet) closeSheet(); });
   $("#sheetbg").addEventListener("mousedown", function (ev) { if (ev.target.id === "sheetbg") closeSheet(); });
 
+  window.addEventListener("popstate", function (e) {
+    if (state.sheet) { closeSheet(); pushNav(); return; }
+    var s = e.state;
+    if (!s || !s.view) return;
+    showViewRaw(s.view);
+    state.screen = s.screen || "home"; state.genre = s.genre || null; state.id = s.id || null;
+    state.edit = false; state.confirmDel = false; state.closed = new Set();
+    if (s.view === "app") render(true);
+  });
+
   applyTheme();
   loadItems();
   renderHead();
-  showView("landing");
+  showViewRaw("landing");
+  try { history.replaceState(snap(), ""); } catch (e) { navOK = false; }
 })();
 </script>
 </body>
