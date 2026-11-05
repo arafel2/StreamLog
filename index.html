@@ -253,6 +253,13 @@ label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); font-we
 .sug h3 { font: 400 34px/1 var(--font-display); overflow-wrap: anywhere; }
 .foot { max-width: 1000px; margin-inline: auto; border-top: 1px solid var(--line); padding-block: 16px 100px; font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
 .foot p { margin: 0; max-width: 70ch; }
+.season .toggle::after { content: "▾"; color: var(--muted); margin-left: 6px; font-size: 16px; }
+.season .toggle[aria-expanded="true"]::after { content: "▴"; }
+.plot { display: grid; gap: 4px; max-width: 72ch; }
+.plot p { margin: 4px 0; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+.plot .clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.linkbtn { justify-self: start; background: none; border: 0; padding: 4px 0; color: var(--accent-text); font-weight: 600; font-size: 15px; }
+.f textarea { width: 100%; min-height: 110px; padding: 10px 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); font: inherit; font-size: 16px; line-height: 1.5; color: var(--ink); resize: vertical; }
 details.tendina { background: var(--bg); border: 1px solid var(--line); border-radius: 16px; }
 details.tendina > summary, .tl details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 details.tendina > summary::-webkit-details-marker, .tl details > summary::-webkit-details-marker { display: none; }
@@ -334,7 +341,7 @@ datalist { display: none; }
   };
   var FMT = { TV: "Serie", TV_SHORT: "Corto", MOVIE: "Film", SPECIAL: "Speciale", OVA: "OVA", ONA: "ONA", MUSIC: "Musica", MANGA: "Manga", NOVEL: "Romanzo", ONE_SHOT: "One shot" };
 
-  var state = { items: new Map(), view: "landing", screen: "home", genre: null, id: null, type: "all", status: "all", q: "", edit: false, confirmDel: false, closed: new Set(), sheet: null };
+  var state = { items: new Map(), view: "landing", screen: "home", genre: null, id: null, type: "all", status: "all", q: "", edit: false, confirmDel: false, opened: new Set(), chOpen: false, plotOpen: false, sheet: null };
 
   function $(s) { return document.querySelector(s); }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -347,6 +354,12 @@ datalist { display: none; }
   function bgStyle(it) { return it.cover ? "background-image:url('" + esc(it.cover) + "')" : grad(it.title); }
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function cleanPlot(s) {
+    if (!s) return "";
+    var d = new DOMParser().parseFromString(String(s).replace(/<br\s*\/?>/gi, "\n"), "text/html");
+    var x = (d.body.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+    return x.length > 1500 ? x.slice(0, 1500).replace(/\s+\S*$/, "") + "…" : x;
+  }
   function normGenre(g) { g = (g || "").trim(); return GENRE_MAP[g] || g; }
 
   /* ---------- calcoli ---------- */
@@ -446,27 +459,27 @@ datalist { display: none; }
       .then(function (r) { if (!r.ok) throw { code: r.status }; return r.json(); })
       .then(function (j) { if (j.errors) throw { code: "gql" }; return j.data; });
   }
-  var AL_QUERY = "query($q:String,$t:MediaType){Page(perPage:8){media(search:$q,type:$t,sort:SEARCH_MATCH){id title{romaji english} coverImage{large} genres format episodes chapters startDate{year} streamingEpisodes{title}}}}";
+  var AL_QUERY = "query($q:String,$t:MediaType){Page(perPage:8){media(search:$q,type:$t,sort:SEARCH_MATCH){id title{romaji english} coverImage{large} genres format episodes chapters startDate{year} streamingEpisodes{title} description(asHtml:false)}}}";
 
   function searchTitles(type, q) {
     if (type === "film") {
       return tmdb("/search/movie", { query: q, include_adult: "false" }).then(function (d) {
-        return (d.results || []).slice(0, 8).map(function (m) { return { src: "tmdb", id: m.id, title: m.title, sub: (m.release_date || "").slice(0, 4), cover: m.poster_path ? IMG + m.poster_path : "" }; });
+        return (d.results || []).slice(0, 8).map(function (m) { return { src: "tmdb", id: m.id, title: m.title, sub: (m.release_date || "").slice(0, 4), cover: m.poster_path ? IMG + m.poster_path : "", plot: m.overview || "", lang: "it" }; });
       });
     }
     if (type === "serie") {
       if (tmdbKey()) {
         return tmdb("/search/tv", { query: q }).then(function (d) {
-          return (d.results || []).slice(0, 8).map(function (m) { return { src: "tmdb", id: m.id, title: m.name, sub: (m.first_air_date || "").slice(0, 4), cover: m.poster_path ? IMG + m.poster_path : "" }; });
+          return (d.results || []).slice(0, 8).map(function (m) { return { src: "tmdb", id: m.id, title: m.name, sub: (m.first_air_date || "").slice(0, 4), cover: m.poster_path ? IMG + m.poster_path : "", plot: m.overview || "", lang: "it" }; });
         });
       }
       return jget("https://api.tvmaze.com/search/shows?q=" + encodeURIComponent(q)).then(function (d) {
-        return d.slice(0, 8).map(function (x) { return { src: "tvmaze", id: x.show.id, title: x.show.name, sub: (x.show.premiered || "").slice(0, 4), cover: x.show.image ? x.show.image.medium : "" }; });
+        return d.slice(0, 8).map(function (x) { return { src: "tvmaze", id: x.show.id, title: x.show.name, sub: (x.show.premiered || "").slice(0, 4), cover: x.show.image ? x.show.image.medium : "", plot: cleanPlot(x.show.summary), lang: "en" }; });
       });
     }
     return anilist(AL_QUERY, { q: q, t: type === "manga" ? "MANGA" : "ANIME" }).then(function (d) {
       return ((d.Page && d.Page.media) || []).map(function (m) {
-        return { src: "anilist", id: m.id, title: m.title.english || m.title.romaji, sub: [FMT[m.format] || m.format || "", m.startDate && m.startDate.year || ""].filter(Boolean).join(" · "), cover: (m.coverImage && m.coverImage.large) || "", raw: m };
+        return { src: "anilist", id: m.id, title: m.title.english || m.title.romaji, sub: [FMT[m.format] || m.format || "", m.startDate && m.startDate.year || ""].filter(Boolean).join(" · "), cover: (m.coverImage && m.coverImage.large) || "", plot: cleanPlot(m.description), lang: "en", raw: m };
       });
     });
   }
@@ -606,7 +619,7 @@ datalist { display: none; }
 
   function seasonsHTML(it) {
     return '<div class="stack">' + it.seasons.map(function (s, si) {
-      var done = s.eps.filter(function (e) { return e.d; }).length, closed = state.closed.has(si), rows = "";
+      var done = s.eps.filter(function (e) { return e.d; }).length, closed = !state.opened.has(si), rows = "";
       if (!closed) {
         rows = s.eps.map(function (e, ei) {
           var n = ei + 1;
@@ -620,21 +633,30 @@ datalist { display: none; }
     }).join("") + (state.edit ? '<button class="btn" data-act="sadd">+ Aggiungi stagione</button>' : "") + "</div>";
   }
   function chaptersHTML(it) {
-    var rows = it.chapters.map(function (c, ci) {
+    var rows = !state.chOpen ? "" : it.chapters.map(function (c, ci) {
       var n = ci + 1;
       if (state.edit) return '<div class="row edit"><span class="no">Cap. ' + n + '</span><input class="t-in" id="ch-' + ci + '" data-act="chtitle" data-c="' + ci + '" value="' + esc(c.t) + '" placeholder="Capitolo ' + n + '" aria-label="Titolo capitolo ' + n + '"><input class="p-in" id="chp-' + ci + '" type="number" min="0" data-act="chpages" data-c="' + ci + '" value="' + (c.p || 0) + '" aria-label="Pagine capitolo ' + n + '"><button class="x" data-act="chdel" data-c="' + ci + '" aria-label="Elimina capitolo ' + n + '">✕</button></div>';
       return '<label class="row' + (c.d ? " done" : "") + '"><input type="checkbox" data-act="ch" data-c="' + ci + '"' + (c.d ? " checked" : "") + '><span class="no">Cap. ' + n + '</span><span class="t' + (c.t ? "" : " ph") + '">' + esc(c.t || "Capitolo " + n) + '</span><span class="pg">' + (c.p || 0) + " p.</span></label>";
     }).join("");
-    var tail = state.edit ? '<div class="tail"><button class="btn small" data-act="chadd" data-n="1">+ 1 capitolo</button><button class="btn small" data-act="chadd" data-n="10">+ 10 capitoli</button></div>' : "";
-    return '<section class="season"><header><span class="toggle">Capitoli<span class="mono">' + stats(it).done + " / " + it.chapters.length + "</span></span>" +
+    var tail = state.edit && state.chOpen ? '<div class="tail"><button class="btn small" data-act="chadd" data-n="1">+ 1 capitolo</button><button class="btn small" data-act="chadd" data-n="10">+ 10 capitoli</button></div>' : "";
+    return '<section class="season"><header><button class="toggle" data-act="chopen" aria-expanded="' + state.chOpen + '">Capitoli<span class="mono">' + stats(it).done + " / " + it.chapters.length + "</span></button>" +
       (state.edit ? "" : '<button class="btn small" data-act="chall">' + (stats(it).done === it.chapters.length && it.chapters.length ? "Deseleziona tutti" : "Segna tutti") + "</button>") + "</header>" + rows + tail + "</section>";
   }
   function editPanel(it) {
     return '<section class="panel"><label class="f" for="etitle">Titolo<input id="etitle" data-act="f-title" value="' + esc(it.title) + '"></label>' +
       '<label class="f" for="egenre">Genere<input id="egenre" data-act="f-genre" list="glist2" value="' + esc(it.genre) + '"></label><datalist id="glist2">' + genreOptions() + "</datalist>" +
+      '<label class="f" for="eplot">Trama<textarea id="eplot" data-act="f-plot" rows="5">' + esc(it.plot || "") + "</textarea></label>" +
       '<div class="row-actions"><label class="btn small" for="ecover">Cambia copertina</label><input id="ecover" type="file" accept="image/*" hidden>' +
       (it.cover ? '<button class="btn small" data-act="rmcover">Togli copertina</button>' : "") +
       (state.confirmDel ? '<button class="btn small danger" data-act="delyes">Conferma eliminazione</button><button class="btn small" data-act="delno">Annulla</button>' : '<button class="btn small danger" data-act="del">Elimina contenuto</button>') + "</div></section>";
+  }
+  function plotHTML(it) {
+    if (it.plot) {
+      var long = it.plot.length > 240;
+      return '<section class="plot"><span class="kicker">Trama' + (it.plotLang === "en" ? " · in inglese" : "") + '</span><p class="' + (long && !state.plotOpen ? "clamp" : "") + '">' + esc(it.plot) + "</p>" +
+        (long ? '<button class="linkbtn" data-act="plotmore">' + (state.plotOpen ? "Mostra meno" : "Leggi tutto") + "</button>" : "") + "</section>";
+    }
+    return '<section class="plot"><span class="kicker">Trama</span><p class="mono">Nessuna trama salvata.</p><div><button class="btn small" data-act="findplot">Cerca la trama online</button></div></section>';
   }
   function itemHTML(it) {
     var s = stats(it), pct = s.total ? Math.round(s.done / s.total * 100) : 0;
@@ -646,7 +668,7 @@ datalist { display: none; }
       '<section class="hero"><div class="thumb" style="' + bgStyle(it) + '">' + (it.cover ? "" : '<span class="initial">' + initial(it.title) + "</span>") + "</div>" +
       '<div class="info"><span class="kicker">' + TYPE_LABEL[it.type] + " · " + esc(it.genre || NOGENRE) + "</span><h1>" + esc(it.title) + "</h1>" +
       '<div class="bar s"><i style="width:' + pct + '%"></i></div><p class="mono">' + s.done + " / " + s.total + " " + unit + " · " + esc(remainingText(it)) + "</p>" +
-      '<div class="actions"><button class="btn small" data-act="edit">' + (state.edit ? "Fine modifica" : "Modifica") + "</button></div></div></section>" +
+      '<div class="actions"><button class="btn small" data-act="edit">' + (state.edit ? "Fine modifica" : "Modifica") + "</button></div></div></section>" + (state.edit ? "" : plotHTML(it)) +
       (state.edit ? editPanel(it) : "") + body;
   }
   function render(top) {
@@ -666,13 +688,13 @@ datalist { display: none; }
     state.screen = screen;
     if ("genre" in opts) state.genre = opts.genre;
     if ("id" in opts) state.id = opts.id;
-    state.edit = false; state.confirmDel = false; state.closed = new Set();
+    state.edit = false; state.confirmDel = false; state.opened = new Set(); state.chOpen = false; state.plotOpen = false;
     render(true);
     if (!opts.noPush) pushNav();
   }
 
   /* ---------- finestre: aggiungi, suggerimento, impostazioni ---------- */
-  function showSheet() { $("#sheetbg").hidden = false; renderSheet(); }
+  function showSheet() { var tt = $("#toast"); if (tt) tt.hidden = true; $("#sheetbg").hidden = false; renderSheet(); }
   function closeSheet() { state.sheet = null; $("#sheetbg").hidden = true; }
   function openAdd() { state.sheet = { mode: "add", step: 1, type: "serie", q: "", results: [], msg: null, loading: false, tok: 0, draft: null, loadingD: false, err: "" }; showSheet(); }
   function openSettings() { state.sheet = { mode: "settings", msg: "" }; showSheet(); }
@@ -695,6 +717,13 @@ datalist { display: none; }
       '<div class="sheet-actions">' + (suggestPool().length > 1 ? '<button type="button" class="btn" data-act="another">Un altro</button>' : "") + '<button type="button" class="btn primary" data-act="opensug">Apri</button></div>';
   }
 
+  function prevHTML(s) {
+    var q = s.manga ? "Hai già letto anche i capitoli precedenti?" : "Hai già visto anche gli episodi precedenti?";
+    var what = s.manga ? pl(s.n, "capitolo", "capitoli") : pl(s.n, "episodio", "episodi");
+    return '<div class="sheet-head"><h2>' + q + '</h2><button type="button" class="icon-btn" data-act="closeSheet" aria-label="Chiudi">✕</button></div>' +
+      '<p class="note">Prima di questo ' + (s.n === 1 ? "c'è ancora " : "ci sono ancora ") + what + (s.n === 1 ? " non segnato." : " non segnati.") + "</p>" +
+      '<div class="sheet-actions"><button type="button" class="btn" data-act="closeSheet">No, solo questo</button><button type="button" class="btn primary" data-act="prevyes">Sì, segna anche i precedenti</button></div>';
+  }
   function sourceLabel(type) {
     if (type === "film") return "TMDB";
     if (type === "serie") return tmdbKey() ? "TMDB" : "TVmaze";
@@ -748,6 +777,7 @@ datalist { display: none; }
     s.step = 2; s.draft = null; s.loadingD = true; s.err = ""; renderSheet();
     details(s.type, r).then(function (d) {
       if (state.sheet !== s) return;
+      if (!d.plot && r.plot) { d.plot = r.plot; d.plotLang = r.lang || ""; }
       if ((d.type === "serie" || d.type === "anime") && (!d.seasons || !d.seasons.length)) {
         d.seasons = [{ count: 12, titles: [] }]; d.needCount = true;
         d.hint = "Non ho trovato gli episodi di questo titolo: inserisci tu il numero.";
@@ -815,14 +845,14 @@ datalist { display: none; }
   function renderSheet() {
     var s = state.sheet;
     if (!s) return;
-    var h = s.mode === "settings" ? settingsHTML() : s.mode === "suggest" ? suggestHTML(s) : (s.step === 1 ? step1HTML(s) : step2HTML(s));
+    var h = s.mode === "settings" ? settingsHTML() : s.mode === "suggest" ? suggestHTML(s) : s.mode === "prev" ? prevHTML(s) : (s.step === 1 ? step1HTML(s) : step2HTML(s));
     $("#sheet").innerHTML = h;
     if (s.mode === "add" && s.step === 1) { renderResults(); var q = $("#sq"); if (q) setTimeout(function () { q.focus(); }, 30); }
   }
   function setSMsg(t) { if (state.sheet) state.sheet.msg = t; var el = $("#smsg"); if (el) el.textContent = t; }
 
   function buildItem(d) {
-    var it = { id: uid(), type: d.type, title: d.title.trim(), genre: d.genre.trim() || NOGENRE, cover: d.cover || "", createdAt: Date.now(), lastAt: Date.now() };
+    var it = { id: uid(), type: d.type, title: d.title.trim(), genre: d.genre.trim() || NOGENRE, cover: d.cover || "", plot: d.plot || "", plotLang: d.plotLang || "", createdAt: Date.now(), lastAt: Date.now() };
     if (d.type === "film") { it.done = 0; return it; }
     if (d.type === "manga") {
       var count = Math.min(Math.max(parseInt(d.chapters.count, 10) || 0, 0), 5000), avg = Math.max(parseInt(d.chapters.avg, 10) || 0, 0);
@@ -879,6 +909,38 @@ datalist { display: none; }
   }
 
   /* ---------- azioni ---------- */
+  function prevCount(it, si, ei) {
+    var n = 0, i;
+    if (it.type === "manga") { for (i = 0; i < ei; i++) if (!it.chapters[i].d) n++; return n; }
+    for (var a = 0; a < si; a++) it.seasons[a].eps.forEach(function (e) { if (!e.d) n++; });
+    for (i = 0; i < ei; i++) if (!it.seasons[si].eps[i].d) n++;
+    return n;
+  }
+  function markPrev(it, si, ei) {
+    var i;
+    if (it.type === "manga") { for (i = 0; i < ei; i++) it.chapters[i].d = 1; return; }
+    for (var a = 0; a < si; a++) it.seasons[a].eps.forEach(function (e) { e.d = 1; });
+    for (i = 0; i < ei; i++) it.seasons[si].eps[i].d = 1;
+  }
+  function askPrev(it, si, ei) {
+    var n = prevCount(it, si, ei);
+    if (!n) return;
+    state.sheet = { mode: "prev", id: it.id, si: si, ei: ei, n: n, manga: it.type === "manga" };
+    showSheet();
+  }
+  function findPlot() {
+    var it = cur();
+    if (!it) return;
+    toast("Cerco la trama…");
+    searchTitles(it.type, it.title).then(function (r) {
+      var m = r.filter(function (x) { return x.plot; })[0];
+      var x = cur();
+      if (!x || x.id !== it.id) return;
+      if (!m) { toast("Non ho trovato una trama per questo titolo."); return; }
+      x.plot = m.plot; x.plotLang = m.lang || ""; touch(x); render();
+      toast("Trama presa da: " + m.title);
+    }).catch(function (e) { toast(errInfo(e).text); });
+  }
   function cur() { return state.items.get(state.id); }
   function change(it) { touch(it); render(); }
 
@@ -896,6 +958,9 @@ datalist { display: none; }
       case "another": sh.pick = suggestPick(sh.pick && sh.pick.id); renderSheet(); break;
       case "opensug": var pk = sh.pick; closeSheet(); if (pk) { state.q = ""; go("item", { id: pk.id, genre: null }); } break;
       case "closeSheet": closeSheet(); break;
+      case "prevyes": var pi = state.items.get(sh.id); if (pi) { markPrev(pi, sh.si, sh.ei); touch(pi); } closeSheet(); render(); break;
+      case "plotmore": state.plotOpen = !state.plotOpen; render(); break;
+      case "findplot": findPlot(); break;
       case "stype":
         sh.type = ds.v; sh.results = []; sh.msg = null; renderSheet();
         if (sh.q.trim()) onSearch(sh.q);
@@ -939,12 +1004,13 @@ datalist { display: none; }
         state.edit = !state.edit; state.confirmDel = false;
         if (!state.edit && (it = cur())) { if (!it.title.trim()) it.title = "Senza titolo"; if (!it.genre.trim()) it.genre = NOGENRE; touch(it); }
         render(); break;
-      case "sopen": s = +ds.s; if (state.closed.has(s)) state.closed.delete(s); else state.closed.add(s); render(); break;
+      case "sopen": s = +ds.s; if (state.opened.has(s)) state.opened.delete(s); else state.opened.add(s); render(); break;
+      case "chopen": state.chOpen = !state.chOpen; render(); break;
       case "sall": it = cur(); s = it.seasons[+ds.s]; var all = s.eps.length && s.eps.every(function (x) { return x.d; }); s.eps.forEach(function (x) { x.d = all ? 0 : 1; }); change(it); break;
       case "chall": it = cur(); var allc = it.chapters.length && it.chapters.every(function (x) { return x.d; }); it.chapters.forEach(function (x) { x.d = allc ? 0 : 1; }); change(it); break;
       case "epadd": it = cur(); s = it.seasons[+ds.s]; for (var i = 0; i < +ds.n; i++) s.eps.push({ t: "", d: 0 }); change(it); break;
       case "epdel": it = cur(); it.seasons[+ds.s].eps.splice(+ds.e, 1); change(it); break;
-      case "sadd": it = cur(); it.seasons.push({ eps: [{ t: "", d: 0 }] }); change(it); break;
+      case "sadd": it = cur(); it.seasons.push({ eps: [{ t: "", d: 0 }] }); state.opened.add(it.seasons.length - 1); change(it); break;
       case "sdel": it = cur(); it.seasons.splice(+ds.s, 1); change(it); break;
       case "chadd":
         it = cur();
@@ -970,8 +1036,15 @@ datalist { display: none; }
       return;
     }
     if (t.id === "imp" && t.files && t.files[0]) { importBackup(t.files[0]); return; }
-    if (a === "ep") { it = cur(); it.seasons[+t.dataset.s].eps[+t.dataset.e].d = t.checked ? 1 : 0; change(it); }
-    else if (a === "ch") { it = cur(); it.chapters[+t.dataset.c].d = t.checked ? 1 : 0; change(it); }
+    if (a === "ep") {
+      it = cur(); var es = +t.dataset.s, ee = +t.dataset.e, eon = t.checked;
+      it.seasons[es].eps[ee].d = eon ? 1 : 0; change(it);
+      if (eon) askPrev(it, es, ee);
+    } else if (a === "ch") {
+      it = cur(); var cc = +t.dataset.c, con = t.checked;
+      it.chapters[cc].d = con ? 1 : 0; change(it);
+      if (con) askPrev(it, 0, cc);
+    }
     else if (a === "film") { it = cur(); it.done = t.checked ? 1 : 0; change(it); }
   });
 
@@ -997,6 +1070,7 @@ datalist { display: none; }
     if (!it) return;
     if (a === "f-title") it.title = t.value;
     else if (a === "f-genre") it.genre = t.value;
+    else if (a === "f-plot") { it.plot = t.value; it.plotLang = ""; }
     else if (a === "eptitle") it.seasons[+t.dataset.s].eps[+t.dataset.e].t = t.value;
     else if (a === "chtitle") it.chapters[+t.dataset.c].t = t.value;
     else if (a === "chpages") it.chapters[+t.dataset.c].p = Math.max(parseInt(t.value, 10) || 0, 0);
@@ -1012,7 +1086,7 @@ datalist { display: none; }
     if (!s || !s.view) return;
     showViewRaw(s.view);
     state.screen = s.screen || "home"; state.genre = s.genre || null; state.id = s.id || null;
-    state.edit = false; state.confirmDel = false; state.closed = new Set();
+    state.edit = false; state.confirmDel = false; state.opened = new Set(); state.chOpen = false; state.plotOpen = false;
     if (s.view === "app") render(true);
   });
 
